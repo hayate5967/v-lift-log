@@ -1,0 +1,28 @@
+# 依存
+node_modules/
+
+# 秘密情報（AGENTS.md: JWT秘密鍵・デバイスAPIキー・.env はコミット厳禁）
+.env
+.env.*
+!.env.example
+
+# ビルド成果物
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# テスト
+coverage/
+playwright-report/
+test-results/
+
+# ログ・エディタ・OS
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json

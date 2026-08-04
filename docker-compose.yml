@@ -1,0 +1,30 @@
+# ローカル開発用の PostgreSQL。
+# アプリ（backend / frontend）はホスト側で npm run する前提。
+#   起動: docker compose up -d      停止: docker compose down
+#   データも消す: docker compose down -v
+# CI（.github/workflows/ci.yml）の services.postgres とイメージを揃えてあるので、
+# 片方を上げるときはもう片方も合わせること。
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: v-lift-log-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-vliftlog}
+    ports:
+      # ホストで別の Postgres が 5432 を使っている場合は .env の DB_PORT で回避する
+      - '${DB_PORT:-5432}:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-vliftlog}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:
