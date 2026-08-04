@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# 構成は backend/（NestJS + Prisma）と frontend/（Next.js）の monorepo に確定。
+# npm スクリプト名（lint / test / test:e2e / build）は各 package.json に合わせること。
+# branch protection の必須チェックには、ジョブ名 "backend" と "frontend" を指定する。
+#
+# 注意: backend/ frontend/ とそれぞれの package-lock.json を作るまで、このワークフローは
+# `npm ci` の時点で失敗する。docs/design.md「実装の進め方」第0部でアプリを生成すれば通る。
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        # docker-compose.yml と同じイメージに揃えている
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: vliftlog_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vliftlog_test
+      # e2e で NestJS を起動するために必要（CI 専用のダミー値）
+      JWT_SECRET: ci-dummy-secret
+      JWT_EXPIRES_IN: 7d
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      # Prisma Client が未生成だと tsc も Jest も型解決に失敗するので、必ず lint より前に置く
+      - run: npx prisma generate
+      - run: npx prisma migrate deploy
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npm run test -- --coverage
+      # 認可の境界（403/401）は e2e で担保する。docs/design.md P-2 を参照
+      - run: npm run test:e2e
+      - run: npm run build
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npm run test --if-present
+      - run: npm run build
+
+  # Playwright の E2E（ログイン→記録→フィード）は Postgres + backend + frontend を
+  # 同時に起こす必要があるため、フロント実装後に以下を有効化する。
+  # 壊れたジョブを置くと branch protection が待ち続けるので、それまではコメントのままにする。
+  #
+  # e2e:
+  #   runs-on: ubuntu-latest
+  #   needs: [backend, frontend]
+  #   services:
+  #     postgres:
+  #       image: postgres:16-alpine
+  #       env:
+  #         POSTGRES_USER: postgres
+  #         POSTGRES_PASSWORD: postgres
+  #         POSTGRES_DB: vliftlog_e2e
+  #       ports: ['5432:5432']
+  #       options: >-
+  #         --health-cmd pg_isready
+  #         --health-interval 10s
+  #         --health-timeout 5s
+  #         --health-retries 5
+  #   env:
+  #     DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vliftlog_e2e
+  #     JWT_SECRET: ci-dummy-secret
+  #     NEXT_PUBLIC_API_BASE_URL: http://localhost:3000
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 22
+  #     - run: npm ci && npx prisma generate && npx prisma migrate deploy && npm run build
+  #       working-directory: backend
+  #     - run: npm ci && npm run build
+  #       working-directory: frontend
+  #     - run: npx playwright install --with-deps chromium
+  #       working-directory: frontend
+  #     # backend/frontend の起動は playwright.config.ts の webServer に任せる
+  #     - run: npx playwright test
+  #       working-directory: frontend
