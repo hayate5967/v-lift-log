@@ -6,12 +6,9 @@ on:
   push:
     branches: [main]
 
-# 構成は backend/（NestJS + Prisma）と frontend/（Next.js）の monorepo に確定。
-# npm スクリプト名（lint / test / test:e2e / build）は各 package.json に合わせること。
+# 構成は backend/（NestJS + Prisma）と frontend/（Next.js）の monorepo。
+# Node のバージョンはルートの .nvmrc と揃えること。
 # branch protection の必須チェックには、ジョブ名 "backend" と "frontend" を指定する。
-#
-# 注意: backend/ frontend/ とそれぞれの package-lock.json を作るまで、このワークフローは
-# `npm ci` の時点で失敗する。docs/design.md「実装の進め方」第0部でアプリを生成すれば通る。
 
 permissions:
   contents: read
@@ -49,7 +46,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
@@ -72,12 +69,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run lint
-      - run: npx tsc --noEmit
+      # typecheck は next typegen で生成される型（LayoutProps 等）に依存するため、
+      # tsc 単体ではなく npm run typecheck を使う
+      - run: npm run typecheck
       - run: npm run test --if-present
       - run: npm run build
 
@@ -109,7 +108,7 @@ jobs:
   #     - uses: actions/checkout@v4
   #     - uses: actions/setup-node@v4
   #       with:
-  #         node-version: 22
+  #         node-version-file: .nvmrc
   #     - run: npm ci && npx prisma generate && npx prisma migrate deploy && npm run build
   #       working-directory: backend
   #     - run: npm ci && npm run build

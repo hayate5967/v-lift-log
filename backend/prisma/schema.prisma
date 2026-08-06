@@ -1,0 +1,126 @@
+// docs/design.md 5-3「DB設計」のスキーマをそのまま実装したもの。
+// 変更するときは設計書側も必ず更新する（乖離させない）。
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime     @default(now())
+  memberships  Membership[]
+  records      Record[]
+  exercises    Exercise[]
+  devices      Device[]
+  sessions     Session[]
+}
+
+model Group {
+  id             String             @id @default(cuid())
+  name           String
+  joinCode       String             @unique
+  createdAt      DateTime           @default(now())
+  memberships    Membership[]
+  visibleRecords RecordVisibility[]
+}
+
+model Membership {
+  id       String   @id @default(cuid())
+  userId   String
+  groupId  String
+  joinedAt DateTime @default(now())
+  user     User     @relation(fields: [userId], references: [id])
+  group    Group    @relation(fields: [groupId], references: [id])
+
+  @@unique([userId, groupId])
+  @@index([groupId])
+}
+
+model Exercise {
+  id              String    @id @default(cuid())
+  name            String
+  createdByUserId String? // null = 既定種目
+  createdBy       User?     @relation(fields: [createdByUserId], references: [id])
+  createdAt       DateTime  @default(now())
+  records         Record[]
+  sessions        Session[]
+}
+
+model Record {
+  id          String             @id @default(cuid())
+  userId      String
+  exerciseId  String
+  performedAt DateTime
+  memo        String?
+  createdAt   DateTime           @default(now())
+  user        User               @relation(fields: [userId], references: [id])
+  exercise    Exercise           @relation(fields: [exerciseId], references: [id])
+  sets        Set[]
+  visibility  RecordVisibility[]
+  session     Session?
+
+  @@index([userId, performedAt])
+}
+
+model Set {
+  id       String @id @default(cuid())
+  recordId String
+  order    Int
+  weight   Float
+  reps     Int
+  velocity Float? // 任意（手入力で未計測なら null）
+  record   Record @relation(fields: [recordId], references: [id], onDelete: Cascade)
+
+  @@index([recordId])
+}
+
+model RecordVisibility {
+  id       String @id @default(cuid())
+  recordId String
+  groupId  String
+  record   Record @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  group    Group  @relation(fields: [groupId], references: [id])
+
+  @@unique([recordId, groupId])
+  @@index([groupId])
+}
+
+model Device {
+  id         String    @id @default(cuid())
+  userId     String
+  name       String
+  apiKeyHash String
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id])
+  sessions   Session[]
+
+  @@index([userId])
+}
+
+model Session {
+  id              String    @id @default(cuid())
+  deviceId        String
+  userId          String
+  exerciseId      String
+  recordId        String    @unique
+  stillDurationMs Int
+  targetReps      Int
+  weight          Float
+  status          String    @default("active") // active | ended
+  startedAt       DateTime  @default(now())
+  endedAt         DateTime?
+  device          Device    @relation(fields: [deviceId], references: [id])
+  user            User      @relation(fields: [userId], references: [id])
+  exercise        Exercise  @relation(fields: [exerciseId], references: [id])
+  record          Record    @relation(fields: [recordId], references: [id])
+
+  @@index([deviceId, status])
+}

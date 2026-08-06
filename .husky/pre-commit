@@ -1,0 +1,3 @@
+# lint-staged は backend/ と frontend/ の package.json にある設定を自動検出し、
+# それぞれのディレクトリを cwd として実行する。
+npx lint-staged

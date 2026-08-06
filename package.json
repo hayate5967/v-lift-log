@@ -1,0 +1,12 @@
+{
+  "name": "v-lift-log",
+  "private": true,
+  "description": "husky / lint-staged を置くためのルート。アプリの依存は backend/ と frontend/ にある（npm workspaces は使わない）",
+  "scripts": {
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7"
+  }
+}
