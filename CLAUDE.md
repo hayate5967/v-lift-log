@@ -13,11 +13,17 @@
 - 環境: `docker compose up -d`（Postgres 起動）/ `docker compose down`
 - バックエンド（`backend/` で実行）: `npm run start:dev` / `npm run test` /
   `npm run test:e2e` / `npm run lint` / `npx tsc --noEmit`
-- フロント（`frontend/` で実行）: `npm run dev` / `npm run build`
+- フロント（`frontend/` で実行）: `npm run dev` / `npm run lint` / `npm run typecheck`
+  ※型チェックは `next typegen` が要るので `tsc --noEmit` 単体では落ちる
 - DB（`backend/` で実行）: `npx prisma migrate dev` / `npx prisma generate` / `npx prisma studio`
 
-初回は `cp .env.example .env` で環境変数を用意する。`.env` はコミットしない。
+環境変数は3か所（ルート=compose用 / `backend/.env` / `frontend/.env.local`）。
+それぞれ `.env.example` からコピーする。`.env` はコミットしない。
+セットアップ手順の詳細は README.md を参照。
 
 ## 進め方
 docs/design.md 末尾「実装の進め方」の順序に従う：
-第0部 土台づくり → 第1部 Web → 第2部 デバイス。
+~~第0部 土台づくり~~（完了）→ **第1部 Web** → 第2部 デバイス。
+
+第1部の順序: Auth（登録/ログイン/JWT）→ Groups → Exercises → Records（+認可）→ Feed → Stats。
+各機能は Controller / Service / Repository の3層と認可判定を意識して実装する。

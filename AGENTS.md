@@ -19,14 +19,19 @@
 
 ## リポジトリ構成
 ```
-backend/    NestJS + Prisma（未作成。docs/design.md 5-1 のモジュール分割に従う）
-frontend/   Next.js App Router（未作成）
-docs/       design.md（設計書）/ adr/（意思決定の記録）
+backend/    NestJS + Prisma。機能モジュールは docs/design.md 5-1 の分割に従って追加する
+  prisma/schema.prisma   design.md 5-3 のスキーマ。変更時は設計書も必ず更新する
+  src/prisma/            PrismaService / PrismaModule（Global）。DBアクセスはここ経由
+frontend/   Next.js App Router + Tailwind CSS
+docs/       design.md（設計書）/ adr/（意思決定の記録。README.md に索引）
 .claude/rules/   ファイル種別ごとの設計ルール（パススコープ）
 .github/    workflows/ci.yml / pull_request_template.md / copilot-instructions.md
-docker-compose.yml   ローカルの Postgres
-.env.example         環境変数の雛形（.env はコミットしない）
+docker-compose.yml   ローカルの Postgres（Postgres のみ。アプリはホストで起動）
+.env.example         compose 用。アプリの環境変数は backend/ と frontend/ に分かれている
+.nvmrc               Node のバージョン。CI もこれを参照する
 ```
+backend/ と frontend/ は独立した package.json を持つ（npm workspaces は使わない）。
+ルートの package.json は husky / lint-staged 専用で、アプリの依存は持たない。
 
 ## アーキテクチャの決まり（厳守）
 - NestJSは3層を守る:
