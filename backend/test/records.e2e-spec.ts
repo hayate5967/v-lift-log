@@ -38,12 +38,15 @@ describe('Records (e2e)', () => {
   };
   const groupName = `E2E記録公開先-${run}`;
   const exerciseName = `E2E種目-${run}`;
+  const strangerExerciseName = `E2E第三者種目-${run}`;
 
   let ownerToken: string;
   let memberToken: string;
   let strangerToken: string;
   let groupId: string;
   let exerciseId: string;
+  let strangerExerciseId: string;
+  let strangerPrivateRecordId: string;
   let privateRecordId: string;
   let sharedRecordId: string;
 
@@ -98,6 +101,24 @@ describe('Records (e2e)', () => {
       .set('Authorization', `Bearer ${ownerToken}`)
       .send({ name: exerciseName });
     exerciseId = (exerciseRes.body as { id: string }).id;
+
+    const strangerExerciseRes = await request(app.getHttpServer())
+      .post('/exercises')
+      .set('Authorization', `Bearer ${strangerToken}`)
+      .send({ name: strangerExerciseName });
+    strangerExerciseId = (strangerExerciseRes.body as { id: string }).id;
+
+    // cursorの認可検証（他人のレコードidをcursorに使えないこと）用に、
+    // ownerからは見えない第三者の非公開レコードを1件用意しておく。
+    const strangerRecordRes = await request(app.getHttpServer())
+      .post('/records')
+      .set('Authorization', `Bearer ${strangerToken}`)
+      .send({
+        exerciseId: strangerExerciseId,
+        performedAt: '2026-01-01',
+        sets: [{ order: 1, weight: 50, reps: 5 }],
+      });
+    strangerPrivateRecordId = (strangerRecordRes.body as RecordBody).id;
   }, 30000);
 
   afterAll(async () => {
@@ -109,7 +130,9 @@ describe('Records (e2e)', () => {
     await prisma.record.deleteMany({ where: { userId: { in: userIds } } });
     await prisma.membership.deleteMany({ where: { userId: { in: userIds } } });
     await prisma.group.deleteMany({ where: { name: groupName } });
-    await prisma.exercise.deleteMany({ where: { name: exerciseName } });
+    await prisma.exercise.deleteMany({
+      where: { name: { in: [exerciseName, strangerExerciseName] } },
+    });
     await prisma.user.deleteMany({ where: { email: { in: emails } } });
     await app.close();
   });
@@ -132,6 +155,18 @@ describe('Records (e2e)', () => {
         .set('Authorization', `Bearer ${ownerToken}`)
         .send({
           exerciseId: 'no-such-exercise',
+          performedAt: '2026-01-01',
+          sets: [{ order: 1, weight: 100, reps: 5 }],
+        })
+        .expect(400);
+    });
+
+    it('他人の非公開カスタム種目のIDを指定すると400', async () => {
+      await request(app.getHttpServer())
+        .post('/records')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({
+          exerciseId: strangerExerciseId,
           performedAt: '2026-01-01',
           sets: [{ order: 1, weight: 100, reps: 5 }],
         })
@@ -250,6 +285,22 @@ describe('Records (e2e)', () => {
       expect(ids).not.toContain(privateRecordId);
       expect(ids).not.toContain(sharedRecordId);
     });
+
+    it('他人の記録idをcursorに指定すると400（ページ位置の推測に使えないようにする）', async () => {
+      await request(app.getHttpServer())
+        .get('/records')
+        .query({ cursor: strangerPrivateRecordId })
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(400);
+    });
+
+    it('自分の記録idをcursorに指定すれば通る', async () => {
+      await request(app.getHttpServer())
+        .get('/records')
+        .query({ cursor: privateRecordId })
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(200);
+    });
   });
 
   describe('GET /groups/:groupId/records', () => {
@@ -268,6 +319,15 @@ describe('Records (e2e)', () => {
         .get(`/groups/${groupId}/records`)
         .set('Authorization', `Bearer ${strangerToken}`)
         .expect(404);
+    });
+
+    it('そのグループに公開されていない記録idをcursorに指定すると400', async () => {
+      // privateRecordIdはこのグループには公開されていない
+      await request(app.getHttpServer())
+        .get(`/groups/${groupId}/records`)
+        .query({ cursor: privateRecordId })
+        .set('Authorization', `Bearer ${memberToken}`)
+        .expect(400);
     });
   });
 

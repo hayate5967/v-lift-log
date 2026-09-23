@@ -69,6 +69,19 @@ export class GroupsRepository {
     return memberships.map((m) => m.groupId);
   }
 
+  /**
+   * 複数グループへの所属を1クエリでまとめて確認する（Recordsの公開先検証用）。
+   * groupIdごとにfindMembershipをループで呼ぶとN+1になるため、これで集約する。
+   */
+  findMembershipsForUser(
+    userId: string,
+    groupIds: string[],
+  ): Promise<Membership[]> {
+    return this.prisma.membership.findMany({
+      where: { userId, groupId: { in: groupIds } },
+    });
+  }
+
   async findMembersOfGroup(groupId: string): Promise<GroupMember[]> {
     const memberships = await this.prisma.membership.findMany({
       where: { groupId },

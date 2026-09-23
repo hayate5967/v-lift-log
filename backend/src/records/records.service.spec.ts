@@ -19,8 +19,12 @@ describe('RecordsService', () => {
     findOwnedByUser: jest.Mock;
     findVisibleToUser: jest.Mock;
   };
-  let exercises: { findById: jest.Mock };
-  let groups: { findMembership: jest.Mock; findGroupIdsForUser: jest.Mock };
+  let exercises: { findVisibleById: jest.Mock };
+  let groups: {
+    findMembership: jest.Mock;
+    findGroupIdsForUser: jest.Mock;
+    findMembershipsForUser: jest.Mock;
+  };
 
   const buildRecord = (
     overrides: Partial<RecordWithRelations> = {},
@@ -55,8 +59,12 @@ describe('RecordsService', () => {
       findOwnedByUser: jest.fn(),
       findVisibleToUser: jest.fn(),
     };
-    exercises = { findById: jest.fn() };
-    groups = { findMembership: jest.fn(), findGroupIdsForUser: jest.fn() };
+    exercises = { findVisibleById: jest.fn() };
+    groups = {
+      findMembership: jest.fn(),
+      findGroupIdsForUser: jest.fn(),
+      findMembershipsForUser: jest.fn(),
+    };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -78,7 +86,7 @@ describe('RecordsService', () => {
 
   describe('create', () => {
     it('存在しない種目なら400', async () => {
-      exercises.findById.mockResolvedValue(null);
+      exercises.findVisibleById.mockResolvedValue(null);
 
       await expect(service.create('owner-1', createDto)).rejects.toBeInstanceOf(
         BadRequestException,
@@ -86,9 +94,24 @@ describe('RecordsService', () => {
       expect(records.createWithSetsAndVisibility).not.toHaveBeenCalled();
     });
 
+    it('他人の非公開カスタム種目は400（存在確認は可視性込みで行う）', async () => {
+      // findVisibleByIdは「自分から見える種目でなければnull」を返す想定のmock。
+      // ここではその契約どおりnullを返させ、ServiceがfindByIdではなく
+      // findVisibleByIdを（userId付きで）使っていることを検証する。
+      exercises.findVisibleById.mockResolvedValue(null);
+
+      await expect(service.create('owner-1', createDto)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(exercises.findVisibleById).toHaveBeenCalledWith(
+        'owner-1',
+        'exercise-1',
+      );
+    });
+
     it('所属していないグループへの公開指定は400', async () => {
-      exercises.findById.mockResolvedValue({ id: 'exercise-1' });
-      groups.findMembership.mockResolvedValue(null);
+      exercises.findVisibleById.mockResolvedValue({ id: 'exercise-1' });
+      groups.findMembershipsForUser.mockResolvedValue([]);
 
       await expect(
         service.create('owner-1', {
@@ -99,9 +122,67 @@ describe('RecordsService', () => {
       expect(records.createWithSetsAndVisibility).not.toHaveBeenCalled();
     });
 
+    it('複数グループ指定時、1つでも未所属があれば400', async () => {
+      exercises.findVisibleById.mockResolvedValue({ id: 'exercise-1' });
+      // group-aのみ所属、group-bは未所属
+      groups.findMembershipsForUser.mockResolvedValue([
+        {
+          id: 'm1',
+          userId: 'owner-1',
+          groupId: 'group-a',
+          joinedAt: new Date(),
+        },
+      ]);
+
+      await expect(
+        service.create('owner-1', {
+          ...createDto,
+          visibilityGroupIds: ['group-a', 'group-b'],
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('公開先グループの所属確認はgroupIdごとのループではなく1クエリで行う（N+1回避）', async () => {
+      exercises.findVisibleById.mockResolvedValue({ id: 'exercise-1' });
+      groups.findMembershipsForUser.mockResolvedValue([
+        {
+          id: 'm1',
+          userId: 'owner-1',
+          groupId: 'group-a',
+          joinedAt: new Date(),
+        },
+        {
+          id: 'm2',
+          userId: 'owner-1',
+          groupId: 'group-b',
+          joinedAt: new Date(),
+        },
+      ]);
+      records.createWithSetsAndVisibility.mockResolvedValue(buildRecord());
+
+      await service.create('owner-1', {
+        ...createDto,
+        visibilityGroupIds: ['group-a', 'group-b'],
+      });
+
+      expect(groups.findMembershipsForUser).toHaveBeenCalledTimes(1);
+      expect(groups.findMembershipsForUser).toHaveBeenCalledWith('owner-1', [
+        'group-a',
+        'group-b',
+      ]);
+      expect(groups.findMembership).not.toHaveBeenCalled();
+    });
+
     it('正常な入力なら作成する', async () => {
-      exercises.findById.mockResolvedValue({ id: 'exercise-1' });
-      groups.findMembership.mockResolvedValue({ id: 'membership-1' });
+      exercises.findVisibleById.mockResolvedValue({ id: 'exercise-1' });
+      groups.findMembershipsForUser.mockResolvedValue([
+        {
+          id: 'm1',
+          userId: 'owner-1',
+          groupId: 'group-a',
+          joinedAt: new Date(),
+        },
+      ]);
       const created = buildRecord({
         visibility: [{ id: 'v1', recordId: 'record-1', groupId: 'group-a' }],
       });
@@ -232,6 +313,47 @@ describe('RecordsService', () => {
     });
   });
 
+  describe('listOwn', () => {
+    it('cursor未指定なら検証なしで一覧を取得する', async () => {
+      const list = [buildRecord()];
+      records.findOwnedByUser.mockResolvedValue(list);
+
+      await expect(service.listOwn('owner-1', {})).resolves.toBe(list);
+      expect(records.findById).not.toHaveBeenCalled();
+    });
+
+    it('他人の記録idをcursorに指定すると400（ページ位置の推測を防ぐ）', async () => {
+      records.findById.mockResolvedValue(
+        buildRecord({ id: 'other-record', userId: 'someone-else' }),
+      );
+
+      await expect(
+        service.listOwn('owner-1', { cursor: 'other-record' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(records.findOwnedByUser).not.toHaveBeenCalled();
+    });
+
+    it('存在しないcursorも400', async () => {
+      records.findById.mockResolvedValue(null);
+
+      await expect(
+        service.listOwn('owner-1', { cursor: 'no-such-record' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('自分の記録idのcursorなら通る', async () => {
+      records.findById.mockResolvedValue(
+        buildRecord({ id: 'record-1', userId: 'owner-1' }),
+      );
+      const list = [buildRecord()];
+      records.findOwnedByUser.mockResolvedValue(list);
+
+      await expect(
+        service.listOwn('owner-1', { cursor: 'record-1' }),
+      ).resolves.toBe(list);
+    });
+  });
+
   describe('listByGroup', () => {
     it('非会員は404', async () => {
       groups.findMembership.mockResolvedValue(null);
@@ -239,6 +361,23 @@ describe('RecordsService', () => {
       await expect(
         service.listByGroup('stranger', 'group-a', {}),
       ).rejects.toBeInstanceOf(NotFoundException);
+      expect(records.findVisibleToUser).not.toHaveBeenCalled();
+    });
+
+    it('そのグループに公開されていない記録idをcursorに指定すると400', async () => {
+      groups.findMembership.mockResolvedValue({ id: 'membership-1' });
+      records.findById.mockResolvedValue(
+        buildRecord({
+          id: 'other-record',
+          visibility: [
+            { id: 'v1', recordId: 'other-record', groupId: 'group-other' },
+          ],
+        }),
+      );
+
+      await expect(
+        service.listByGroup('member', 'group-a', { cursor: 'other-record' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
       expect(records.findVisibleToUser).not.toHaveBeenCalled();
     });
 

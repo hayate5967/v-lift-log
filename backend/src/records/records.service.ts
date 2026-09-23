@@ -32,7 +32,7 @@ export class RecordsService {
     userId: string,
     dto: CreateRecordDto,
   ): Promise<RecordWithRelations> {
-    await this.assertExerciseExists(dto.exerciseId);
+    await this.assertExerciseExists(userId, dto.exerciseId);
     const visibilityGroupIds = dto.visibilityGroupIds ?? [];
     await this.assertMemberOfAll(userId, visibilityGroupIds);
 
@@ -47,10 +47,14 @@ export class RecordsService {
   }
 
   /** GET /records: 自分の記録一覧。 */
-  listOwn(
+  async listOwn(
     userId: string,
     pagination: PaginationQueryDto,
   ): Promise<RecordWithRelations[]> {
+    await this.assertCursorAccessible(
+      pagination.cursor,
+      (record) => record.userId === userId,
+    );
     return this.records.findOwnedByUser(
       userId,
       this.resolvePagination(pagination),
@@ -78,7 +82,7 @@ export class RecordsService {
     await this.getForMutation(userId, recordId);
 
     if (dto.exerciseId) {
-      await this.assertExerciseExists(dto.exerciseId);
+      await this.assertExerciseExists(userId, dto.exerciseId);
     }
     if (dto.visibilityGroupIds) {
       await this.assertMemberOfAll(userId, dto.visibilityGroupIds);
@@ -109,6 +113,9 @@ export class RecordsService {
     if (!membership) {
       throw new NotFoundException('グループが見つかりません');
     }
+    await this.assertCursorAccessible(pagination.cursor, (record) =>
+      record.visibility.some((v) => v.groupId === groupId),
+    );
     return this.records.findVisibleToUser(
       userId,
       [],
@@ -147,24 +154,59 @@ export class RecordsService {
     return record.visibility.some((v) => myGroupIds.includes(v.groupId));
   }
 
-  private async assertExerciseExists(exerciseId: string): Promise<void> {
-    const exercise = await this.exercises.findById(exerciseId);
+  /**
+   * 既定種目 or 自分のカスタム種目でなければ400にする。
+   * findByIdではなくfindVisibleByIdを使う（他人の非公開カスタム種目を弾くため）。
+   */
+  private async assertExerciseExists(
+    userId: string,
+    exerciseId: string,
+  ): Promise<void> {
+    const exercise = await this.exercises.findVisibleById(userId, exerciseId);
     if (!exercise) {
       throw new BadRequestException('指定された種目が見つかりません');
     }
   }
 
+  /** groupIdごとにfindMembershipをループ呼びするとN+1になるため、1クエリでまとめて確認する。 */
   private async assertMemberOfAll(
     userId: string,
     groupIds: string[],
   ): Promise<void> {
-    for (const groupId of groupIds) {
-      const membership = await this.groups.findMembership(userId, groupId);
-      if (!membership) {
-        throw new BadRequestException(
-          '公開先に指定されたグループの中に、所属していないものが含まれています',
-        );
-      }
+    if (groupIds.length === 0) {
+      return;
+    }
+    const memberships = await this.groups.findMembershipsForUser(
+      userId,
+      groupIds,
+    );
+    const memberGroupIds = new Set(memberships.map((m) => m.groupId));
+    const hasUnauthorizedGroup = groupIds.some(
+      (groupId) => !memberGroupIds.has(groupId),
+    );
+    if (hasUnauthorizedGroup) {
+      throw new BadRequestException(
+        '公開先に指定されたグループの中に、所属していないものが含まれています',
+      );
+    }
+  }
+
+  /**
+   * ページングのcursorに、閲覧権限の無い（他人の）記録idが渡された場合に400にする。
+   * 未検証のcursorをそのままPrismaのcursorページネーションに渡すと、
+   * cursor行の並び替え用の値（performedAt等）が閲覧権限を無視して参照されてしまい、
+   * 権限の無い記録の存在やおおよその日付を推測できてしまうため。
+   */
+  private async assertCursorAccessible(
+    cursor: string | undefined,
+    isAccessible: (record: RecordWithRelations) => boolean,
+  ): Promise<void> {
+    if (!cursor) {
+      return;
+    }
+    const record = await this.records.findById(cursor);
+    if (!record || !isAccessible(record)) {
+      throw new BadRequestException('cursorが不正です');
     }
   }
 
