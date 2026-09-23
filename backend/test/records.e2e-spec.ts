@@ -9,6 +9,7 @@ interface RecordBody {
   id: string;
   userId: string;
   memo: string | null;
+  exercise: { id: string; name: string };
 }
 
 /**
@@ -287,7 +288,11 @@ describe('Records (e2e)', () => {
         .get(`/records/${sharedRecordId}`)
         .set('Authorization', `Bearer ${memberToken}`)
         .expect(200);
-      expect((res.body as RecordBody).memo).toBe('グループ公開');
+      const body = res.body as RecordBody;
+      expect(body.memo).toBe('グループ公開');
+      // exerciseは所有者(owner)のカスタム種目。member自身のGET /exercisesには
+      // 出てこない（可視性ルールが別）が、Record応答には種目名が同梱されているべき。
+      expect(body.exercise).toEqual({ id: exerciseId, name: exerciseName });
     });
 
     it('公開先グループに属さない第三者は404', async () => {

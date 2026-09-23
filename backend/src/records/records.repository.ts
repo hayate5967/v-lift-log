@@ -10,6 +10,7 @@ export type RecordWithRelations = PrismaRecord & {
   sets: SetModel[];
   visibility: RecordVisibility[];
   user: { id: string; name: string };
+  exercise: { id: string; name: string };
 };
 
 interface SetInput {
@@ -28,6 +29,10 @@ const includeRelations = {
   sets: { orderBy: { order: 'asc' as const } },
   visibility: true,
   user: { select: { id: true, name: true } },
+  // Recordの閲覧者は所有者と異なりうる（グループ公開/Feed）ため、閲覧者自身の
+  // GET /exercisesの可視性（既定+自分のカスタム）では種目名を解決できないことがある。
+  // userと同様、最小限のフィールドをここに同梱してフロントの表示を成立させる。
+  exercise: { select: { id: true, name: true } },
 };
 
 /**

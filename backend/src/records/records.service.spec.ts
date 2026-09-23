@@ -47,6 +47,7 @@ describe('RecordsService', () => {
     ],
     visibility: [],
     user: { id: 'owner-1', name: 'オーナー' },
+    exercise: { id: 'exercise-1', name: 'ベンチプレス' },
     ...overrides,
   });
 
