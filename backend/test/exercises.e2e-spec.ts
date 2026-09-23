@@ -70,7 +70,9 @@ describe('Exercises (e2e)', () => {
 
   afterAll(async () => {
     const emails = [owner.email, other.email];
-    await prisma.exercise.deleteMany({ where: { name: customName } });
+    await prisma.exercise.deleteMany({
+      where: { name: { in: [customName, `E2Eマイ種目trim-${run}`] } },
+    });
     await prisma.user.deleteMany({ where: { email: { in: emails } } });
     await app.close();
   });
@@ -101,6 +103,25 @@ describe('Exercises (e2e)', () => {
         .set('Authorization', `Bearer ${ownerToken}`)
         .send({ name: '' })
         .expect(400);
+    });
+
+    it('空白のみの名前は400', async () => {
+      await request(app.getHttpServer())
+        .post('/exercises')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ name: '   ' })
+        .expect(400);
+    });
+
+    it('前後に空白のある名前はtrimして保存する', async () => {
+      const paddedName = `E2Eマイ種目trim-${run}`;
+      const res = await request(app.getHttpServer())
+        .post('/exercises')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ name: `  ${paddedName}  ` })
+        .expect(201);
+
+      expect((res.body as ExerciseBody).name).toBe(paddedName);
     });
   });
 
