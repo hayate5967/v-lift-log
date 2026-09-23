@@ -156,6 +156,10 @@ GET    /feed        (auth)?groupId?&limit&cursor → 閲覧可能な記録を新
 
 `visibilityGroupIds`が空配列/未指定の場合、その記録は「自分だけ」（`RecordVisibility`に行を作らない）。
 
+応答の`record`には`sets`・`visibility`・`user{id,name}`に加え`exercise{id,name}`を同梱する。
+閲覧者は記録の所有者と異なりうる（グループ公開/Feed）ため、閲覧者自身の`GET /exercises`の
+可視性（既定+自分のカスタム）だけでは種目名を解決できないことがあるため。
+
 ## 6. Stats `[未実装]`
 
 ```
