@@ -82,8 +82,12 @@ describe('Groups (e2e)', () => {
     });
     const userIds = users.map((u) => u.id);
     await prisma.membership.deleteMany({ where: { userId: { in: userIds } } });
+    // containsだと、並列実行時に他specファイルのrun(Date.now())が偶然一致/部分一致した場合に
+    // そのファイルのグループまで削除対象になり得る（実際に発生した）。厳密な名前一致にする。
     await prisma.group.deleteMany({
-      where: { name: { contains: String(run) } },
+      where: {
+        name: { in: [`E2Eグループ-${run}`, `E2Eグループtrim-${run}`] },
+      },
     });
     await prisma.user.deleteMany({ where: { email: { in: emails } } });
     await app.close();
