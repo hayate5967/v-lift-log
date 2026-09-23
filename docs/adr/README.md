@@ -1,7 +1,7 @@
 # Architecture Decision Records
 
 1判断 = 1ファイル。「なぜそう決めたか」と「何を捨てたか」を残す。
-新しい判断をしたら `0009-` から連番で追加する。ファイル名は `NNNN-kebab-case-title.md`。
+新しい判断をしたら `0010-` から連番で追加する。ファイル名は `NNNN-kebab-case-title.md`。
 
 書式は既存の ADR に合わせる:
 ステータス / 日付 / 背景 / 決定 / 理由 / 検討した代替案 / 影響。
@@ -19,3 +19,4 @@
 | [0006](0006-monorepo-without-workspaces.md) | backend/ + frontend/ の monorepo とし、npm workspaces は使わない |
 | [0007](0007-compose-runs-postgres-only.md) | docker-compose は Postgres だけを対象にする |
 | [0008](0008-no-symlink-for-copilot-instructions.md) | copilot-instructions.md をシンボリックリンクにしない |
+| [0009](0009-stateless-jwt-in-response-body.md) | 認証はステートレスな JWT とし、トークンはレスポンスボディで返す |
