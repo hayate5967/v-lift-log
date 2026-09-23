@@ -20,7 +20,13 @@ export default async function FeedPage({
   return (
     <div className="flex flex-col gap-4">
       <GroupFilter groups={groups} />
-      <FeedList initialRecords={records} groupId={groupId} />
+      {/* groupId変更時にuseState(initialRecords)が古いまま残らないよう、
+          keyでFeedListごと再マウントして一覧をリセットする。 */}
+      <FeedList
+        key={groupId ?? 'all'}
+        initialRecords={records}
+        groupId={groupId}
+      />
     </div>
   );
 }

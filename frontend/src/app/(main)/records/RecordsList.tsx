@@ -6,14 +6,13 @@ import { Button } from '@/components/ui/Button';
 import { ErrorText } from '@/components/ui/ErrorText';
 import { RecordItem } from '@/lib/api/types';
 import { PAGE_LIMIT } from '@/lib/api/records';
-import { loadMoreFeedAction } from './actions';
+import { loadMoreOwnRecordsAction } from './actions';
 
-interface FeedListProps {
+export function RecordsList({
+  initialRecords,
+}: {
   initialRecords: RecordItem[];
-  groupId?: string;
-}
-
-export function FeedList({ initialRecords, groupId }: FeedListProps) {
+}) {
   const [records, setRecords] = useState(initialRecords);
   const [hasMore, setHasMore] = useState(initialRecords.length >= PAGE_LIMIT);
   const [error, setError] = useState<string>();
@@ -27,7 +26,7 @@ export function FeedList({ initialRecords, groupId }: FeedListProps) {
     setError(undefined);
     startTransition(async () => {
       try {
-        const more = await loadMoreFeedAction(last.id, groupId);
+        const more = await loadMoreOwnRecordsAction(last.id);
         setRecords((prev) => [...prev, ...more]);
         setHasMore(more.length >= PAGE_LIMIT);
       } catch {
@@ -45,7 +44,7 @@ export function FeedList({ initialRecords, groupId }: FeedListProps) {
       <ul className="flex flex-col gap-3">
         {records.map((record) => (
           <li key={record.id}>
-            <RecordListItem record={record} showOwner />
+            <RecordListItem record={record} />
           </li>
         ))}
       </ul>

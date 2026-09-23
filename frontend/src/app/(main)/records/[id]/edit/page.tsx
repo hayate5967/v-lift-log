@@ -1,9 +1,8 @@
 import { notFound, redirect } from 'next/navigation';
-import { requireToken } from '@/lib/session';
+import { requireToken, requireUser } from '@/lib/session';
 import { getRecord } from '@/lib/api/records';
 import { listExercises } from '@/lib/api/exercises';
 import { listGroups } from '@/lib/api/groups';
-import { me } from '@/lib/api/auth';
 import { ApiError } from '@/lib/api/errors';
 import { RecordForm } from '../../RecordForm';
 import { updateRecordAction } from '../../actions';
@@ -16,14 +15,14 @@ export default async function EditRecordPage({
   const { id } = await params;
   const token = await requireToken();
 
-  const [recordResult, { user }] = await Promise.all([
+  const [recordResult, user] = await Promise.all([
     getRecord(token, id).catch((e: unknown) => {
       if (e instanceof ApiError && e.status === 404) {
         notFound();
       }
       throw e;
     }),
-    me(token),
+    requireUser(token),
   ]);
   if (recordResult.userId !== user.id) {
     // 閲覧はできても所有者でなければbackendがPATCHを403で弾くため、

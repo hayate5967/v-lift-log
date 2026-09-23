@@ -1,5 +1,8 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { me } from './api/auth';
+import { ApiError } from './api/errors';
+import { PublicUser } from './api/types';
 import { SESSION_COOKIE_NAME } from './constants';
 
 // backendのJWT_EXPIRES_IN既定値（7d）に合わせる。ADR-0009: tokenはhttpOnly Cookieに
@@ -21,6 +24,25 @@ export async function requireToken(): Promise<string> {
     redirect('/login');
   }
   return token;
+}
+
+/**
+ * (main)配下のページで「今ログイン中の本人」を取得する共通ヘルパー。
+ * 401（token失効/不正）は/session-expiredへ横流しし、Cookie削除+/loginへの
+ * 巻き戻りを一箇所に集約する（(main)/layout.tsxと同じ挙動を各ページでも揃える。
+ * 各ページが個別にme()を呼んでcatch漏れすると、layoutとは違う汎用エラー画面に
+ * 落ちてしまうため）。
+ */
+export async function requireUser(token: string): Promise<PublicUser> {
+  try {
+    const { user } = await me(token);
+    return user;
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401) {
+      redirect('/session-expired');
+    }
+    throw e;
+  }
 }
 
 export async function setToken(token: string): Promise<void> {
