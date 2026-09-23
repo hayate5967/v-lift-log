@@ -16,6 +16,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { CreateRecordDto } from './dto/create-record.dto';
+import { FeedQueryDto } from './dto/feed-query.dto';
 import { UpdateRecordDto } from './dto/update-record.dto';
 import { RecordWithRelations } from './records.repository';
 import { RecordsService } from './records.service';
@@ -78,5 +79,13 @@ export class RecordsController {
     @Query() pagination: PaginationQueryDto,
   ): Promise<RecordWithRelations[]> {
     return this.records.listByGroup(user.id, groupId, pagination);
+  }
+
+  @Get('feed')
+  feed(
+    @CurrentUser() user: PublicUser,
+    @Query() query: FeedQueryDto,
+  ): Promise<RecordWithRelations[]> {
+    return this.records.listFeed(user.id, query);
   }
 }
