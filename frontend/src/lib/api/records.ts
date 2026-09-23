@@ -47,3 +47,27 @@ export function updateRecord(
 export function deleteRecord(token: string, id: string): Promise<void> {
   return apiFetch(`/records/${id}`, { method: 'DELETE', token });
 }
+
+// backend共通のPaginationQueryDtoの既定値（backend/src/common/dto/pagination-query.dto.ts）。
+// 「もっと見る」の表示要否を判定するヒューリスティックに使う。
+export const FEED_PAGE_LIMIT = 20;
+
+export interface FeedQuery {
+  groupId?: string;
+  cursor?: string;
+}
+
+/** GET /feed: 自分の記録+所属グループに公開された記録を新しい順で。 */
+export function listFeed(
+  token: string,
+  query: FeedQuery = {},
+): Promise<RecordItem[]> {
+  return apiFetch('/feed', {
+    token,
+    searchParams: {
+      groupId: query.groupId,
+      cursor: query.cursor,
+      limit: FEED_PAGE_LIMIT,
+    },
+  });
+}
