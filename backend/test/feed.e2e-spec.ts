@@ -185,6 +185,14 @@ describe('Feed (e2e)', () => {
       expect(ids).not.toContain(olderSharedRecordId);
       expect(ids).not.toContain(newerSharedRecordId);
     });
+
+    it('閲覧権限の無い記録idをcursorに指定すると400（ページ位置の推測に使えないようにする）', async () => {
+      await request(app.getHttpServer())
+        .get('/feed')
+        .query({ cursor: privateRecordId })
+        .set('Authorization', `Bearer ${strangerToken}`)
+        .expect(400);
+    });
   });
 
   describe('GET /feed?groupId=', () => {
@@ -207,6 +215,15 @@ describe('Feed (e2e)', () => {
         .query({ groupId })
         .set('Authorization', `Bearer ${strangerToken}`)
         .expect(404);
+    });
+
+    it('そのグループに公開されていない記録idをcursorに指定すると400', async () => {
+      // privateRecordIdはこのグループには公開されていない
+      await request(app.getHttpServer())
+        .get('/feed')
+        .query({ groupId, cursor: privateRecordId })
+        .set('Authorization', `Bearer ${memberToken}`)
+        .expect(400);
     });
   });
 });

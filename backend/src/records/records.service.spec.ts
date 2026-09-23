@@ -339,6 +339,18 @@ describe('RecordsService', () => {
       );
     });
 
+    it('exerciseIdに空文字を指定すると400（truthyチェックのすり抜けを防ぐ）', async () => {
+      const record = buildRecord({ userId: 'owner-1' });
+      records.findById.mockResolvedValue(record);
+      exercises.findVisibleById.mockResolvedValue(null);
+
+      await expect(
+        service.update('owner-1', 'record-1', { exerciseId: '' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(exercises.findVisibleById).toHaveBeenCalledWith('owner-1', '');
+      expect(records.replaceWithSetsAndVisibility).not.toHaveBeenCalled();
+    });
+
     it('所有者以外は削除403', async () => {
       const record = buildRecord({ userId: 'owner-1', visibility: [] });
       records.findById.mockResolvedValue(record);
@@ -481,6 +493,56 @@ describe('RecordsService', () => {
         { limit: 20, cursor: undefined },
         'group-a',
       );
+    });
+
+    it('閲覧権限の無い記録idをcursorに指定すると400（Recordsと同じ認可漏れを防ぐ）', async () => {
+      groups.findGroupIdsForUser.mockResolvedValue(['group-a']);
+      // 自分の記録でも、所属グループ(group-a)への公開でもない他人の記録
+      records.findById.mockResolvedValue(
+        buildRecord({
+          id: 'foreign-record',
+          userId: 'someone-else',
+          visibility: [],
+        }),
+      );
+
+      await expect(
+        service.listFeed('member', { cursor: 'foreign-record' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(records.findVisibleToUser).not.toHaveBeenCalled();
+    });
+
+    it('groupId絞り込み時は、そのグループには公開されていない記録idのcursorも400', async () => {
+      groups.findGroupIdsForUser.mockResolvedValue(['group-a', 'group-b']);
+      // group-bには公開されているが、絞り込み対象のgroup-aには公開されていない
+      records.findById.mockResolvedValue(
+        buildRecord({
+          id: 'other-group-record',
+          visibility: [
+            { id: 'v1', recordId: 'other-group-record', groupId: 'group-b' },
+          ],
+        }),
+      );
+
+      await expect(
+        service.listFeed('member', {
+          groupId: 'group-a',
+          cursor: 'other-group-record',
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('自分の記録idのcursorなら（groupId未指定で）通る', async () => {
+      groups.findGroupIdsForUser.mockResolvedValue([]);
+      records.findById.mockResolvedValue(
+        buildRecord({ id: 'record-1', userId: 'member' }),
+      );
+      const list = [buildRecord()];
+      records.findVisibleToUser.mockResolvedValue(list);
+
+      await expect(
+        service.listFeed('member', { cursor: 'record-1' }),
+      ).resolves.toBe(list);
     });
   });
 });

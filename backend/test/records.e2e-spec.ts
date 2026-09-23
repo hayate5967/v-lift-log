@@ -181,6 +181,23 @@ describe('Records (e2e)', () => {
         .expect(400);
     });
 
+    it('weight=0（自重種目）・velocity=0（停止レップ）は許容される', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/records')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({
+          exerciseId,
+          performedAt: '2026-01-01',
+          sets: [{ order: 1, weight: 0, reps: 10, velocity: 0 }],
+        })
+        .expect(201);
+      // 後片付け用に削除しておく（このテストだけ作って残す記録を増やさない）
+      await request(app.getHttpServer())
+        .delete(`/records/${(res.body as RecordBody).id}`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(204);
+    });
+
     it('所属していないグループへの公開指定は400', async () => {
       await request(app.getHttpServer())
         .post('/records')
@@ -380,6 +397,14 @@ describe('Records (e2e)', () => {
         .set('Authorization', `Bearer ${ownerToken}`)
         .send({ visibilityGroupIds: [groupId, groupId] })
         .expect(200);
+    });
+
+    it('exerciseIdに空文字を指定すると400（truthyチェックのすり抜けで500にならない）', async () => {
+      await request(app.getHttpServer())
+        .patch(`/records/${privateRecordId}`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ exerciseId: '' })
+        .expect(400);
     });
   });
 

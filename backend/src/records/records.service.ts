@@ -84,7 +84,9 @@ export class RecordsService {
   ): Promise<RecordWithRelations> {
     await this.getForMutation(userId, recordId);
 
-    if (dto.exerciseId) {
+    // truthyチェック(if (dto.exerciseId))だと空文字列''がすり抜けてPrismaのFK制約違反(500)に
+    // なってしまうため、「キーが指定されたか」で判定する。
+    if (dto.exerciseId !== undefined) {
       await this.assertExerciseExists(userId, dto.exerciseId);
     }
     // 重複したgroupIdによるRecordVisibilityの一意制約違反(500)を防ぐため、
@@ -144,6 +146,14 @@ export class RecordsService {
     if (query.groupId && !myGroupIds.includes(query.groupId)) {
       throw new NotFoundException('グループが見つかりません');
     }
+    // findVisibleToUserのwhere条件（groupId指定時はそのグループ公開のみ／
+    // 未指定時は自分の記録+所属グループ公開）と同じ基準でcursorの妥当性を確認する。
+    await this.assertCursorAccessible(query.cursor, (record) =>
+      query.groupId
+        ? record.visibility.some((v) => v.groupId === query.groupId)
+        : record.userId === userId ||
+          record.visibility.some((v) => myGroupIds.includes(v.groupId)),
+    );
 
     return this.records.findVisibleToUser(
       userId,
