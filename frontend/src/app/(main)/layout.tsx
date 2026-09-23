@@ -7,8 +7,8 @@ import { BottomNav } from '@/components/BottomNav';
 import { logoutAction } from './actions';
 
 /**
- * 本人確認の正。middleware.tsはCookieの有無だけを見る軽量ガードなので、
- * ここで毎回 GET /auth/me を呼び、失効・不正なtokenは401としてログインへ戻す。
+ * 本人確認の正。proxy.ts（Next.js 16の新規約。旧middleware）はCookieの有無だけを見る
+ * 軽量ガードなので、ここで毎回 GET /auth/me を呼び、失効・不正なtokenは401としてログインへ戻す。
  */
 export default async function MainLayout({
   children,
@@ -26,7 +26,9 @@ export default async function MainLayout({
     userName = user.name;
   } catch (e) {
     if (e instanceof ApiError && e.status === 401) {
-      redirect('/login');
+      // Server Component描画中はCookieを書き換えられないため、Route Handler
+      // （/session-expired）を経由してCookieを消してから/loginへ戻す。
+      redirect('/session-expired');
     }
     throw e;
   }
