@@ -2,7 +2,6 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireToken } from '@/lib/session';
 import { getRecord } from '@/lib/api/records';
-import { listExercises } from '@/lib/api/exercises';
 import { me } from '@/lib/api/auth';
 import { ApiError } from '@/lib/api/errors';
 import { Card } from '@/components/ui/Card';
@@ -18,25 +17,21 @@ export default async function RecordDetailPage({
   const { id } = await params;
   const token = await requireToken();
 
-  const recordResult = await getRecord(token, id).catch((e: unknown) => {
-    if (e instanceof ApiError && e.status === 404) {
-      notFound();
-    }
-    throw e;
-  });
-
-  const [{ user }, exercises] = await Promise.all([
+  const [recordResult, { user }] = await Promise.all([
+    getRecord(token, id).catch((e: unknown) => {
+      if (e instanceof ApiError && e.status === 404) {
+        notFound();
+      }
+      throw e;
+    }),
     me(token),
-    listExercises(token),
   ]);
-  const exerciseName =
-    exercises.find((ex) => ex.id === recordResult.exerciseId)?.name ?? '種目';
   const isOwner = recordResult.userId === user.id;
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-bold">{exerciseName}</h1>
+        <h1 className="text-lg font-bold">{recordResult.exercise.name}</h1>
         <span className="text-sm text-zinc-500">
           {new Date(recordResult.performedAt).toLocaleDateString('ja-JP')}
         </span>
