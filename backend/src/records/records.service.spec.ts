@@ -442,4 +442,45 @@ describe('RecordsService', () => {
       );
     });
   });
+
+  describe('listFeed', () => {
+    it('groupId未指定なら自分の所属グループ全体を対象に取得する', async () => {
+      groups.findGroupIdsForUser.mockResolvedValue(['group-a', 'group-b']);
+      const list = [buildRecord()];
+      records.findVisibleToUser.mockResolvedValue(list);
+
+      await expect(service.listFeed('member', {})).resolves.toBe(list);
+      expect(records.findVisibleToUser).toHaveBeenCalledWith(
+        'member',
+        ['group-a', 'group-b'],
+        { limit: 20, cursor: undefined },
+        undefined,
+      );
+    });
+
+    it('所属していないgroupIdを指定すると404', async () => {
+      groups.findGroupIdsForUser.mockResolvedValue(['group-a']);
+
+      await expect(
+        service.listFeed('member', { groupId: 'group-x' }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(records.findVisibleToUser).not.toHaveBeenCalled();
+    });
+
+    it('所属しているgroupIdを指定するとその1グループに絞る', async () => {
+      groups.findGroupIdsForUser.mockResolvedValue(['group-a']);
+      const list = [buildRecord()];
+      records.findVisibleToUser.mockResolvedValue(list);
+
+      await expect(
+        service.listFeed('member', { groupId: 'group-a' }),
+      ).resolves.toBe(list);
+      expect(records.findVisibleToUser).toHaveBeenCalledWith(
+        'member',
+        ['group-a'],
+        { limit: 20, cursor: undefined },
+        'group-a',
+      );
+    });
+  });
 });

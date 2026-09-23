@@ -11,6 +11,7 @@ import {
 import { ExercisesRepository } from '../exercises/exercises.repository';
 import { GroupsRepository } from '../groups/groups.repository';
 import { CreateRecordDto } from './dto/create-record.dto';
+import { FeedQueryDto } from './dto/feed-query.dto';
 import { UpdateRecordDto } from './dto/update-record.dto';
 import { RecordsRepository, RecordWithRelations } from './records.repository';
 
@@ -128,6 +129,27 @@ export class RecordsService {
       [],
       this.resolvePagination(pagination),
       groupId,
+    );
+  }
+
+  /**
+   * GET /feed: 自分の記録 + 所属グループに公開された記録を新しい順で返す。
+   * groupId指定時は、その1グループに絞る（未所属のgroupIdは404扱い）。
+   */
+  async listFeed(
+    userId: string,
+    query: FeedQueryDto,
+  ): Promise<RecordWithRelations[]> {
+    const myGroupIds = await this.groups.findGroupIdsForUser(userId);
+    if (query.groupId && !myGroupIds.includes(query.groupId)) {
+      throw new NotFoundException('グループが見つかりません');
+    }
+
+    return this.records.findVisibleToUser(
+      userId,
+      myGroupIds,
+      this.resolvePagination(query),
+      query.groupId,
     );
   }
 
