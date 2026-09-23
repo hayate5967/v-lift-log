@@ -17,7 +17,19 @@ export default function NewGroupPage() {
   return (
     <div className="flex flex-col gap-4">
       <h1 className="text-lg font-bold">グループを作成</h1>
-      <form action={formAction} className="flex flex-col gap-4">
+      <form
+        action={formAction}
+        onSubmit={(e) => {
+          // HTML5のrequiredは空白のみの値を通してしまい、backendの
+          // MinLength違反（未ローカライズの英語メッセージ）がそのまま出てしまうため、
+          // 送信前に弾く。
+          const value = new FormData(e.currentTarget).get('name');
+          if (typeof value !== 'string' || value.trim() === '') {
+            e.preventDefault();
+          }
+        }}
+        className="flex flex-col gap-4"
+      >
         <Input
           label="グループ名"
           name="name"

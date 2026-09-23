@@ -1,7 +1,6 @@
-import { notFound } from 'next/navigation';
 import { requireToken } from '@/lib/session';
 import { getGroupDetail, listGroupRecords } from '@/lib/api/groups';
-import { ApiError } from '@/lib/api/errors';
+import { notFoundOn404 } from '@/lib/api/errors';
 import { Card } from '@/components/ui/Card';
 import { RecordListItem } from '@/components/RecordListItem';
 import { CopyJoinCodeButton } from './CopyJoinCodeButton';
@@ -13,13 +12,6 @@ export default async function GroupDetailPage({
 }) {
   const { id } = await params;
   const token = await requireToken();
-
-  const notFoundOn404 = (e: unknown) => {
-    if (e instanceof ApiError && e.status === 404) {
-      notFound();
-    }
-    throw e;
-  };
 
   const [{ group, members }, records] = await Promise.all([
     getGroupDetail(token, id).catch(notFoundOn404),
