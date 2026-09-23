@@ -202,6 +202,28 @@ describe('RecordsService', () => {
         }),
       );
     });
+
+    it('重複したgroupIdは1つに集約する（一意制約違反による500を防ぐ）', async () => {
+      exercises.findVisibleById.mockResolvedValue({ id: 'exercise-1' });
+      groups.findMembershipsForUser.mockResolvedValue([
+        {
+          id: 'm1',
+          userId: 'owner-1',
+          groupId: 'group-a',
+          joinedAt: new Date(),
+        },
+      ]);
+      records.createWithSetsAndVisibility.mockResolvedValue(buildRecord());
+
+      await service.create('owner-1', {
+        ...createDto,
+        visibilityGroupIds: ['group-a', 'group-a'],
+      });
+
+      expect(records.createWithSetsAndVisibility).toHaveBeenCalledWith(
+        expect.objectContaining({ visibilityGroupIds: ['group-a'] }),
+      );
+    });
   });
 
   describe('getForView（認可の中心）', () => {
@@ -292,6 +314,29 @@ describe('RecordsService', () => {
       await expect(
         service.update('owner-1', 'record-1', { memo: '更新後' }),
       ).resolves.toBe(updated);
+    });
+
+    it('visibilityGroupIdsの重複は1つに集約する（一意制約違反による500を防ぐ）', async () => {
+      const record = buildRecord({ userId: 'owner-1' });
+      records.findById.mockResolvedValue(record);
+      groups.findMembershipsForUser.mockResolvedValue([
+        {
+          id: 'm1',
+          userId: 'owner-1',
+          groupId: 'group-a',
+          joinedAt: new Date(),
+        },
+      ]);
+      records.replaceWithSetsAndVisibility.mockResolvedValue(buildRecord());
+
+      await service.update('owner-1', 'record-1', {
+        visibilityGroupIds: ['group-a', 'group-a'],
+      });
+
+      expect(records.replaceWithSetsAndVisibility).toHaveBeenCalledWith(
+        'record-1',
+        expect.objectContaining({ visibilityGroupIds: ['group-a'] }),
+      );
     });
 
     it('所有者以外は削除403', async () => {

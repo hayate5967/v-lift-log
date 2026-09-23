@@ -33,7 +33,9 @@ export class RecordsService {
     dto: CreateRecordDto,
   ): Promise<RecordWithRelations> {
     await this.assertExerciseExists(userId, dto.exerciseId);
-    const visibilityGroupIds = dto.visibilityGroupIds ?? [];
+    // 重複したgroupIdをそのままRecordVisibilityの作成に渡すと
+    // @@unique([recordId, groupId])制約違反で未処理の500になるため、ここで重複を除去する。
+    const visibilityGroupIds = [...new Set(dto.visibilityGroupIds ?? [])];
     await this.assertMemberOfAll(userId, visibilityGroupIds);
 
     return this.records.createWithSetsAndVisibility({
@@ -84,8 +86,13 @@ export class RecordsService {
     if (dto.exerciseId) {
       await this.assertExerciseExists(userId, dto.exerciseId);
     }
-    if (dto.visibilityGroupIds) {
-      await this.assertMemberOfAll(userId, dto.visibilityGroupIds);
+    // 重複したgroupIdによるRecordVisibilityの一意制約違反(500)を防ぐため、
+    // 渡された場合のみ重複を除去する（未指定=現状維持とは区別する）。
+    const visibilityGroupIds = dto.visibilityGroupIds
+      ? [...new Set(dto.visibilityGroupIds)]
+      : undefined;
+    if (visibilityGroupIds) {
+      await this.assertMemberOfAll(userId, visibilityGroupIds);
     }
 
     return this.records.replaceWithSetsAndVisibility(recordId, {
@@ -93,7 +100,7 @@ export class RecordsService {
       performedAt: dto.performedAt ? new Date(dto.performedAt) : undefined,
       memo: dto.memo,
       sets: dto.sets,
-      visibilityGroupIds: dto.visibilityGroupIds,
+      visibilityGroupIds,
     });
   }
 

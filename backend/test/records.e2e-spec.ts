@@ -194,6 +194,23 @@ describe('Records (e2e)', () => {
         .expect(400);
     });
 
+    it('visibilityGroupIdsに同じグループIDを重複指定しても201になる（一意制約違反で500にならない）', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/records')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({
+          exerciseId,
+          performedAt: '2026-01-01',
+          sets: [{ order: 1, weight: 100, reps: 5 }],
+          visibilityGroupIds: [groupId, groupId],
+        })
+        .expect(201);
+      await request(app.getHttpServer())
+        .delete(`/records/${(res.body as RecordBody).id}`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(204);
+    });
+
     it('公開先を指定しなければ非公開記録として作成できる（201）', async () => {
       const res = await request(app.getHttpServer())
         .post('/records')
@@ -355,6 +372,14 @@ describe('Records (e2e)', () => {
         .set('Authorization', `Bearer ${strangerToken}`)
         .send({ memo: '書き換え' })
         .expect(404);
+    });
+
+    it('visibilityGroupIdsに同じグループIDを重複指定しても200になる（一意制約違反で500にならない）', async () => {
+      await request(app.getHttpServer())
+        .patch(`/records/${sharedRecordId}`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ visibilityGroupIds: [groupId, groupId] })
+        .expect(200);
     });
   });
 
