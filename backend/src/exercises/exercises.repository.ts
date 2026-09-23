@@ -18,9 +18,22 @@ export class ExercisesRepository {
     });
   }
 
-  /** Recordsが種目の存在確認に使う。 */
   findById(id: string): Promise<Exercise | null> {
     return this.prisma.exercise.findUnique({ where: { id } });
+  }
+
+  /**
+   * Recordsが種目の存在確認に使う。既定種目 or 自分のカスタム種目でなければnull。
+   * findByIdだと他人の非公開カスタム種目まで「存在する」扱いになってしまうため、
+   * findVisibleToUserと同じ可視性条件で絞り込む。
+   */
+  findVisibleById(userId: string, id: string): Promise<Exercise | null> {
+    return this.prisma.exercise.findFirst({
+      where: {
+        id,
+        OR: [{ createdByUserId: null }, { createdByUserId: userId }],
+      },
+    });
   }
 
   create(data: { name: string; createdByUserId: string }): Promise<Exercise> {
