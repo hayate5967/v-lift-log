@@ -82,7 +82,9 @@ describe('Groups (e2e)', () => {
     });
     const userIds = users.map((u) => u.id);
     await prisma.membership.deleteMany({ where: { userId: { in: userIds } } });
-    await prisma.group.deleteMany({ where: { name: `E2Eグループ-${run}` } });
+    await prisma.group.deleteMany({
+      where: { name: { contains: String(run) } },
+    });
     await prisma.user.deleteMany({ where: { email: { in: emails } } });
     await app.close();
   });
@@ -114,6 +116,25 @@ describe('Groups (e2e)', () => {
       expect((listRes.body as GroupBody[]).map((g) => g.id)).toContain(
         group.id,
       );
+    });
+
+    it('前後に空白のある名前はtrimして保存する', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/groups')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ name: `  E2Eグループtrim-${run}  ` })
+        .expect(201);
+
+      const body = res.body as { group: GroupBody };
+      expect(body.group.name).toBe(`E2Eグループtrim-${run}`);
+    });
+
+    it('空白のみの名前は400', async () => {
+      await request(app.getHttpServer())
+        .post('/groups')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ name: '   ' })
+        .expect(400);
     });
   });
 
@@ -167,6 +188,15 @@ describe('Groups (e2e)', () => {
       await request(app.getHttpServer())
         .get(`/groups/${group.id}`)
         .set('Authorization', `Bearer ${memberToken}`)
+        .expect(200);
+    });
+
+    it('参加コードは大文字小文字を区別せず、前後の空白も無視する', async () => {
+      const messyCode = `  ${group.joinCode.toLowerCase()}  `;
+      await request(app.getHttpServer())
+        .post('/groups/join')
+        .set('Authorization', `Bearer ${strangerToken}`)
+        .send({ joinCode: messyCode })
         .expect(200);
     });
 

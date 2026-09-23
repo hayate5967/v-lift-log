@@ -1,8 +1,14 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { Group, Membership } from '@prisma/client';
+import { Group, Membership, Prisma } from '@prisma/client';
 import { GroupsRepository } from './groups.repository';
 import { GroupsService } from './groups.service';
+
+const buildUniqueConstraintError = (): Prisma.PrismaClientKnownRequestError =>
+  new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+    code: 'P2002',
+    clientVersion: '6.19.3',
+  });
 
 describe('GroupsService', () => {
   let service: GroupsService;
@@ -94,6 +100,29 @@ describe('GroupsService', () => {
         service.create('user-1', { name: 'ベンチプレス部' }),
       ).rejects.toBeInstanceOf(ConflictException);
       expect(groups.createGroupWithCreatorMembership).not.toHaveBeenCalled();
+    });
+
+    it('事前チェック後に他リクエストが同じコードを使っていた場合（DB側の一意制約違反）は再試行する', async () => {
+      groups.findByJoinCode.mockResolvedValue(null);
+      groups.createGroupWithCreatorMembership
+        .mockRejectedValueOnce(buildUniqueConstraintError())
+        .mockResolvedValueOnce(buildGroup());
+
+      const result = await service.create('user-1', { name: 'ベンチプレス部' });
+
+      expect(groups.createGroupWithCreatorMembership).toHaveBeenCalledTimes(2);
+      expect(result.group).toEqual(buildGroup());
+    });
+
+    it('一意制約違反以外のエラーは再試行せずそのまま投げる', async () => {
+      groups.findByJoinCode.mockResolvedValue(null);
+      const unexpected = new Error('DB接続エラー');
+      groups.createGroupWithCreatorMembership.mockRejectedValue(unexpected);
+
+      await expect(
+        service.create('user-1', { name: 'ベンチプレス部' }),
+      ).rejects.toBe(unexpected);
+      expect(groups.createGroupWithCreatorMembership).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -187,6 +216,29 @@ describe('GroupsService', () => {
         service.join('user-1', { joinCode: 'ABCD1234' }),
       ).resolves.toEqual({ group });
       expect(groups.createMembership).toHaveBeenCalledWith('user-1', 'group-1');
+    });
+
+    it('事前チェック後に多重リクエストで参加済みになっていた場合（DB側の一意制約違反）も409にする', async () => {
+      const group = buildGroup();
+      groups.findByJoinCode.mockResolvedValue(group);
+      groups.findMembership.mockResolvedValue(null);
+      groups.createMembership.mockRejectedValue(buildUniqueConstraintError());
+
+      await expect(
+        service.join('user-1', { joinCode: 'ABCD1234' }),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('一意制約違反以外のエラーは再試行せずそのまま投げる', async () => {
+      const group = buildGroup();
+      groups.findByJoinCode.mockResolvedValue(group);
+      groups.findMembership.mockResolvedValue(null);
+      const unexpected = new Error('DB接続エラー');
+      groups.createMembership.mockRejectedValue(unexpected);
+
+      await expect(
+        service.join('user-1', { joinCode: 'ABCD1234' }),
+      ).rejects.toBe(unexpected);
     });
   });
 });
