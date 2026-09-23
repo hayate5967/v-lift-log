@@ -22,11 +22,13 @@ function parseSets(formData: FormData): SetInput[] {
 }
 
 function buildInput(formData: FormData): RecordInput {
-  const memo = String(formData.get('memo') ?? '').trim();
+  // 空文字列でも常にmemoキーを含める。undefinedにするとJSON.stringifyでキーごと
+  // 落ちてしまい、PATCH時にbackendの「キー無し=現状維持」セマンティクスと衝突して
+  // メモを空にする編集が保存されない（既存メモが残ってしまう）。
   return {
     exerciseId: String(formData.get('exerciseId') ?? ''),
     performedAt: String(formData.get('performedAt') ?? ''),
-    memo: memo || undefined,
+    memo: String(formData.get('memo') ?? '').trim(),
     sets: parseSets(formData),
     visibilityGroupIds: formData.getAll('visibilityGroupIds').map(String),
   };
@@ -68,7 +70,17 @@ export async function updateRecordAction(
 
 export async function deleteRecordAction(id: string): Promise<void> {
   const token = await requireToken();
-  await deleteRecord(token, id);
+  try {
+    await deleteRecord(token, id);
+  } catch (e) {
+    // deleteはuseActionStateを使わないフォームのため、フォーム内でエラー表示できない。
+    // app/(main)/error.tsx の境界に捕捉させ、メッセージだけ分かりやすく保つ。
+    throw new Error(
+      e instanceof ApiError
+        ? e.message
+        : '削除に失敗しました。通信エラーが発生しました',
+    );
+  }
   revalidatePath('/records');
   redirect('/records');
 }

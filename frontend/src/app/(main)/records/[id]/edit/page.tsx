@@ -16,14 +16,15 @@ export default async function EditRecordPage({
   const { id } = await params;
   const token = await requireToken();
 
-  const recordResult = await getRecord(token, id).catch((e: unknown) => {
-    if (e instanceof ApiError && e.status === 404) {
-      notFound();
-    }
-    throw e;
-  });
-
-  const { user } = await me(token);
+  const [recordResult, { user }] = await Promise.all([
+    getRecord(token, id).catch((e: unknown) => {
+      if (e instanceof ApiError && e.status === 404) {
+        notFound();
+      }
+      throw e;
+    }),
+    me(token),
+  ]);
   if (recordResult.userId !== user.id) {
     // 閲覧はできても所有者でなければbackendがPATCHを403で弾くため、
     // フォームを見せずに詳細ページへ戻す。
