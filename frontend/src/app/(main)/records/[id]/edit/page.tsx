@@ -1,9 +1,9 @@
-import { notFound, redirect } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import { requireToken, requireUser } from '@/lib/session';
 import { getRecord } from '@/lib/api/records';
 import { listExercises } from '@/lib/api/exercises';
 import { listGroups } from '@/lib/api/groups';
-import { ApiError } from '@/lib/api/errors';
+import { notFoundOn404 } from '@/lib/api/errors';
 import { RecordForm } from '../../RecordForm';
 import { updateRecordAction } from '../../actions';
 
@@ -16,12 +16,7 @@ export default async function EditRecordPage({
   const token = await requireToken();
 
   const [recordResult, user] = await Promise.all([
-    getRecord(token, id).catch((e: unknown) => {
-      if (e instanceof ApiError && e.status === 404) {
-        notFound();
-      }
-      throw e;
-    }),
+    getRecord(token, id).catch(notFoundOn404),
     requireUser(token),
   ]);
   if (recordResult.userId !== user.id) {

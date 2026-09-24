@@ -1,8 +1,7 @@
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
 import { requireToken, requireUser } from '@/lib/session';
 import { getRecord } from '@/lib/api/records';
-import { ApiError } from '@/lib/api/errors';
+import { notFoundOn404 } from '@/lib/api/errors';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { DeleteRecordButton } from '../DeleteRecordButton';
@@ -17,12 +16,7 @@ export default async function RecordDetailPage({
   const token = await requireToken();
 
   const [recordResult, user] = await Promise.all([
-    getRecord(token, id).catch((e: unknown) => {
-      if (e instanceof ApiError && e.status === 404) {
-        notFound();
-      }
-      throw e;
-    }),
+    getRecord(token, id).catch(notFoundOn404),
     requireUser(token),
   ]);
   const isOwner = recordResult.userId === user.id;
