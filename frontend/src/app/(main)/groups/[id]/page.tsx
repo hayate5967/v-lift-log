@@ -1,9 +1,10 @@
 import { requireToken } from '@/lib/session';
 import { getGroupDetail, listGroupRecords } from '@/lib/api/groups';
-import { notFoundOn404 } from '@/lib/api/errors';
+import { redirectOn401OrNotFoundOn404 } from '@/lib/api/errors';
 import { Card } from '@/components/ui/Card';
+import { PaginatedRecordsList } from '@/components/PaginatedRecordsList';
 import { CopyJoinCodeButton } from './CopyJoinCodeButton';
-import { GroupRecordsList } from './GroupRecordsList';
+import { loadMoreGroupRecordsAction } from '../actions';
 
 export default async function GroupDetailPage({
   params,
@@ -14,8 +15,8 @@ export default async function GroupDetailPage({
   const token = await requireToken();
 
   const [{ group, members }, records] = await Promise.all([
-    getGroupDetail(token, id).catch(notFoundOn404),
-    listGroupRecords(token, id).catch(notFoundOn404),
+    getGroupDetail(token, id).catch(redirectOn401OrNotFoundOn404),
+    listGroupRecords(token, id).catch(redirectOn401OrNotFoundOn404),
   ]);
 
   return (
@@ -47,7 +48,12 @@ export default async function GroupDetailPage({
 
       <div>
         <h2 className="mb-2 text-sm font-medium text-zinc-700">記録</h2>
-        <GroupRecordsList groupId={id} initialRecords={records} />
+        <PaginatedRecordsList
+          initialRecords={records}
+          loadMore={loadMoreGroupRecordsAction.bind(null, id)}
+          showOwner
+          emptyMessage="まだ公開された記録がありません。"
+        />
       </div>
     </div>
   );

@@ -42,3 +42,37 @@ export function redirectOn401(e: unknown): void {
     redirect('/session-expired');
   }
 }
+
+/**
+ * Server Componentでの`.catch(redirectOn401OrNotFoundOn404)`用。requireUser(token)
+ * と同じリクエストの中で本体データ取得（例: getRecord）もPromise.allで並行実行する
+ * 場合、両方が同時に401を返しうる。Promise.allは先に確定した方の結果で全体の
+ * reject理由が決まるため、データ取得側の生のApiErrorが先に外へ出てCookie未削除の
+ * まま汎用エラー画面に落ちることがある。データ取得側のcatchでも401を
+ * redirectOn401と同じ経路に倒しておくことで、どちらが先に確定してもrequireUser()
+ * と同じ/session-expiredへの遷移になり、レースそのものを無害化する。
+ */
+export function redirectOn401OrNotFoundOn404(e: unknown): never {
+  redirectOn401(e);
+  notFoundOn404(e);
+}
+
+/**
+ * Server Actionの「呼んで成功なら値を返す、401ならredirectOn401、それ以外の
+ * ApiErrorはフォームに出すメッセージへ変換する」という繰り返しの多い形を
+ * 共通化する。呼び出し側は`if (!result.ok) return { error: result.error }`の
+ * 後、`result.value`を使って残りの処理（revalidatePath・redirect等）を続ける。
+ */
+export async function runMutationAction<T>(
+  call: () => Promise<T>,
+): Promise<{ ok: true; value: T } | { ok: false; error: string }> {
+  try {
+    return { ok: true, value: await call() };
+  } catch (e) {
+    redirectOn401(e);
+    return {
+      ok: false,
+      error: e instanceof ApiError ? e.message : '通信エラーが発生しました',
+    };
+  }
+}

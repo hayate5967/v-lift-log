@@ -10,7 +10,7 @@ import {
   type RecordInput,
   type SetInput,
 } from '@/lib/api/records';
-import { ApiError, redirectOn401 } from '@/lib/api/errors';
+import { runMutationAction } from '@/lib/api/errors';
 import { requireToken } from '@/lib/session';
 import { RecordItem } from '@/lib/api/types';
 
@@ -41,13 +41,11 @@ export async function createRecordAction(
   formData: FormData,
 ): Promise<RecordFormState> {
   const token = await requireToken();
-  try {
-    await createRecord(token, buildInput(formData));
-  } catch (e) {
-    redirectOn401(e);
-    return {
-      error: e instanceof ApiError ? e.message : '通信エラーが発生しました',
-    };
+  const result = await runMutationAction(() =>
+    createRecord(token, buildInput(formData)),
+  );
+  if (!result.ok) {
+    return { error: result.error };
   }
   // /feedにも自分の記録が出るため、Router Cacheに古い一覧が残らないよう合わせて無効化する。
   revalidatePath('/records');
@@ -61,13 +59,11 @@ export async function updateRecordAction(
   formData: FormData,
 ): Promise<RecordFormState> {
   const token = await requireToken();
-  try {
-    await updateRecord(token, id, buildInput(formData));
-  } catch (e) {
-    redirectOn401(e);
-    return {
-      error: e instanceof ApiError ? e.message : '通信エラーが発生しました',
-    };
+  const result = await runMutationAction(() =>
+    updateRecord(token, id, buildInput(formData)),
+  );
+  if (!result.ok) {
+    return { error: result.error };
   }
   revalidatePath('/records');
   revalidatePath(`/records/${id}`);
@@ -77,17 +73,11 @@ export async function updateRecordAction(
 
 export async function deleteRecordAction(id: string): Promise<void> {
   const token = await requireToken();
-  try {
-    await deleteRecord(token, id);
-  } catch (e) {
-    redirectOn401(e);
+  const result = await runMutationAction(() => deleteRecord(token, id));
+  if (!result.ok) {
     // deleteはuseActionStateを使わないフォームのため、フォーム内でエラー表示できない。
     // app/(main)/error.tsx の境界に捕捉させ、メッセージだけ分かりやすく保つ。
-    throw new Error(
-      e instanceof ApiError
-        ? e.message
-        : '削除に失敗しました。通信エラーが発生しました',
-    );
+    throw new Error(result.error);
   }
   revalidatePath('/records');
   revalidatePath('/feed');
@@ -102,10 +92,9 @@ export async function loadMoreOwnRecordsAction(
   cursor: string,
 ): Promise<RecordItem[]> {
   const token = await requireToken();
-  try {
-    return await listOwnRecords(token, cursor);
-  } catch (e) {
-    redirectOn401(e);
-    throw e;
+  const result = await runMutationAction(() => listOwnRecords(token, cursor));
+  if (!result.ok) {
+    throw new Error(result.error);
   }
+  return result.value;
 }
