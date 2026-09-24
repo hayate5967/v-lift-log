@@ -80,41 +80,39 @@ jobs:
       - run: npm run test --if-present
       - run: npm run build
 
-  # Playwright の E2E（ログイン→記録→フィード）は Postgres + backend + frontend を
-  # 同時に起こす必要があるため、フロント実装後に以下を有効化する。
-  # 壊れたジョブを置くと branch protection が待ち続けるので、それまではコメントのままにする。
-  #
-  # e2e:
-  #   runs-on: ubuntu-latest
-  #   needs: [backend, frontend]
-  #   services:
-  #     postgres:
-  #       image: postgres:16-alpine
-  #       env:
-  #         POSTGRES_USER: postgres
-  #         POSTGRES_PASSWORD: postgres
-  #         POSTGRES_DB: vliftlog_e2e
-  #       ports: ['5432:5432']
-  #       options: >-
-  #         --health-cmd pg_isready
-  #         --health-interval 10s
-  #         --health-timeout 5s
-  #         --health-retries 5
-  #   env:
-  #     DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vliftlog_e2e
-  #     JWT_SECRET: ci-dummy-secret
-  #     NEXT_PUBLIC_API_BASE_URL: http://localhost:3000
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-node@v4
-  #       with:
-  #         node-version-file: .nvmrc
-  #     - run: npm ci && npx prisma generate && npx prisma migrate deploy && npm run build
-  #       working-directory: backend
-  #     - run: npm ci && npm run build
-  #       working-directory: frontend
-  #     - run: npx playwright install --with-deps chromium
-  #       working-directory: frontend
-  #     # backend/frontend の起動は playwright.config.ts の webServer に任せる
-  #     - run: npx playwright test
-  #       working-directory: frontend
+  # Playwright の E2E（ログイン→記録→フィード）。Postgres + backend + frontend を
+  # 同時に起こす必要があるため、backend/frontend ジョブの後に実行する。
+  e2e:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: vliftlog_e2e
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vliftlog_e2e
+      JWT_SECRET: ci-dummy-secret
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - run: npm ci && npx prisma generate && npx prisma migrate deploy && npm run build
+        working-directory: backend
+      - run: npm ci && npm run build
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      # backend/frontend の起動は playwright.config.ts の webServer に任せる
+      - run: npm run test:e2e
+        working-directory: frontend
