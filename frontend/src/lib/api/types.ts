@@ -53,6 +53,9 @@ export interface RecordItem {
   sets: RecordSet[];
   visibility: RecordVisibility[];
   user: { id: string; name: string };
+  // 閲覧者は所有者と異なりうる（グループ公開/Feed）ため、閲覧者自身の
+  // GET /exercisesでは種目名を解決できないことがある。backendが同梱する。
+  exercise: { id: string; name: string };
 }
 
 export type StatsMetric = 'maxWeight' | 'est1RM' | 'maxVelocity';
