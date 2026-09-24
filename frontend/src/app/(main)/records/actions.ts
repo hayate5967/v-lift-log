@@ -5,12 +5,14 @@ import { revalidatePath } from 'next/cache';
 import {
   createRecord,
   deleteRecord,
+  listOwnRecords,
   updateRecord,
   type RecordInput,
   type SetInput,
 } from '@/lib/api/records';
 import { ApiError } from '@/lib/api/errors';
 import { requireToken } from '@/lib/session';
+import { RecordItem } from '@/lib/api/types';
 
 export interface RecordFormState {
   error?: string;
@@ -46,7 +48,9 @@ export async function createRecordAction(
       error: e instanceof ApiError ? e.message : '通信エラーが発生しました',
     };
   }
+  // /feedにも自分の記録が出るため、Router Cacheに古い一覧が残らないよう合わせて無効化する。
   revalidatePath('/records');
+  revalidatePath('/feed');
   redirect('/records');
 }
 
@@ -65,6 +69,7 @@ export async function updateRecordAction(
   }
   revalidatePath('/records');
   revalidatePath(`/records/${id}`);
+  revalidatePath('/feed');
   redirect(`/records/${id}`);
 }
 
@@ -82,5 +87,17 @@ export async function deleteRecordAction(id: string): Promise<void> {
     );
   }
   revalidatePath('/records');
+  revalidatePath('/feed');
   redirect('/records');
+}
+
+/**
+ * 「もっと見る」用。tokenはhttpOnly Cookieでブラウザ側JSから読めないため、
+ * クライアントから直接backendを叩けない。Server Action経由でtokenを補って取得する。
+ */
+export async function loadMoreOwnRecordsAction(
+  cursor: string,
+): Promise<RecordItem[]> {
+  const token = await requireToken();
+  return listOwnRecords(token, cursor);
 }

@@ -25,8 +25,14 @@ export function createRecord(
 }
 
 /** GET /records: 自分の記録一覧。 */
-export function listOwnRecords(token: string): Promise<RecordItem[]> {
-  return apiFetch('/records', { token });
+export function listOwnRecords(
+  token: string,
+  cursor?: string,
+): Promise<RecordItem[]> {
+  return apiFetch('/records', {
+    token,
+    searchParams: { cursor, limit: PAGE_LIMIT },
+  });
 }
 
 /** GET /records/:id */
@@ -46,4 +52,28 @@ export function updateRecord(
 /** DELETE /records/:id */
 export function deleteRecord(token: string, id: string): Promise<void> {
   return apiFetch(`/records/${id}`, { method: 'DELETE', token });
+}
+
+// backend共通のPaginationQueryDtoの既定値（backend/src/common/dto/pagination-query.dto.ts）。
+// 「もっと見る」の表示要否を判定するヒューリスティックに使う。
+export const PAGE_LIMIT = 20;
+
+export interface FeedQuery {
+  groupId?: string;
+  cursor?: string;
+}
+
+/** GET /feed: 自分の記録+所属グループに公開された記録を新しい順で。 */
+export function listFeed(
+  token: string,
+  query: FeedQuery = {},
+): Promise<RecordItem[]> {
+  return apiFetch('/feed', {
+    token,
+    searchParams: {
+      groupId: query.groupId,
+      cursor: query.cursor,
+      limit: PAGE_LIMIT,
+    },
+  });
 }
