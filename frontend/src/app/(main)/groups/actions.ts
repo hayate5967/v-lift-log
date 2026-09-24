@@ -2,9 +2,10 @@
 
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
-import { createGroup, joinGroup } from '@/lib/api/groups';
-import { ApiError } from '@/lib/api/errors';
+import { createGroup, joinGroup, listGroupRecords } from '@/lib/api/groups';
+import { runMutationAction } from '@/lib/api/errors';
 import { requireToken } from '@/lib/session';
+import { RecordItem } from '@/lib/api/types';
 
 export interface GroupFormState {
   error?: string;
@@ -17,17 +18,30 @@ export async function createGroupAction(
   const token = await requireToken();
   const name = String(formData.get('name') ?? '');
 
-  let groupId: string;
-  try {
-    const { group } = await createGroup(token, name);
-    groupId = group.id;
-  } catch (e) {
-    return {
-      error: e instanceof ApiError ? e.message : '通信エラーが発生しました',
-    };
+  const result = await runMutationAction(() => createGroup(token, name));
+  if (!result.ok) {
+    return { error: result.error };
   }
   revalidatePath('/groups');
-  redirect(`/groups/${groupId}`);
+  redirect(`/groups/${result.value.group.id}`);
+}
+
+/**
+ * 「もっと見る」用。tokenはhttpOnly Cookieでブラウザ側JSから読めないため、
+ * クライアントから直接backendを叩けない。Server Action経由でtokenを補って取得する。
+ */
+export async function loadMoreGroupRecordsAction(
+  groupId: string,
+  cursor: string,
+): Promise<RecordItem[]> {
+  const token = await requireToken();
+  const result = await runMutationAction(() =>
+    listGroupRecords(token, groupId, cursor),
+  );
+  if (!result.ok) {
+    throw new Error(result.error);
+  }
+  return result.value;
 }
 
 export async function joinGroupAction(
@@ -37,15 +51,10 @@ export async function joinGroupAction(
   const token = await requireToken();
   const joinCode = String(formData.get('joinCode') ?? '');
 
-  let groupId: string;
-  try {
-    const { group } = await joinGroup(token, joinCode);
-    groupId = group.id;
-  } catch (e) {
-    return {
-      error: e instanceof ApiError ? e.message : '通信エラーが発生しました',
-    };
+  const result = await runMutationAction(() => joinGroup(token, joinCode));
+  if (!result.ok) {
+    return { error: result.error };
   }
   revalidatePath('/groups');
-  redirect(`/groups/${groupId}`);
+  redirect(`/groups/${result.value.group.id}`);
 }

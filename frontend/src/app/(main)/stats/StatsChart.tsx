@@ -10,6 +10,7 @@ import {
   YAxis,
 } from 'recharts';
 import { StatsMetric, StatsPoint } from '@/lib/api/types';
+import { formatMonthDay } from '@/lib/date';
 
 const METRIC_LABELS: Record<StatsMetric, string> = {
   maxWeight: '最大重量(kg)',
@@ -33,10 +34,7 @@ export function StatsChart({
   }
 
   const data = points.map((point) => ({
-    date: new Date(point.performedAt).toLocaleDateString('ja-JP', {
-      month: 'numeric',
-      day: 'numeric',
-    }),
+    date: formatMonthDay(point.performedAt),
     value: Math.round(point.value * 100) / 100,
   }));
 

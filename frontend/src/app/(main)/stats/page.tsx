@@ -22,12 +22,12 @@ export default async function StatsPage({
   const metric = parseMetric(rawMetric);
   const token = await requireToken();
 
-  const exercises = await listExercises(token);
-
-  let points: StatsPoint[] | null = null;
-  if (exerciseId && metric) {
-    points = await getStats(token, { exerciseId, metric });
-  }
+  const [exercises, points] = await Promise.all([
+    listExercises(token),
+    exerciseId && metric
+      ? getStats(token, { exerciseId, metric })
+      : Promise.resolve<StatsPoint[] | null>(null),
+  ]);
 
   return (
     <div className="flex flex-col gap-4">

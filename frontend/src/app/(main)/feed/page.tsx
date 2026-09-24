@@ -1,8 +1,9 @@
 import { requireToken } from '@/lib/session';
 import { listFeed } from '@/lib/api/records';
 import { listGroups } from '@/lib/api/groups';
+import { PaginatedRecordsList } from '@/components/PaginatedRecordsList';
 import { GroupFilter } from './GroupFilter';
-import { FeedList } from './FeedList';
+import { loadMoreFeedAction } from './actions';
 
 export default async function FeedPage({
   searchParams,
@@ -21,11 +22,13 @@ export default async function FeedPage({
     <div className="flex flex-col gap-4">
       <GroupFilter groups={groups} />
       {/* groupId変更時にuseState(initialRecords)が古いまま残らないよう、
-          keyでFeedListごと再マウントして一覧をリセットする。 */}
-      <FeedList
+          keyで再マウントして一覧をリセットする。 */}
+      <PaginatedRecordsList
         key={groupId ?? 'all'}
         initialRecords={records}
-        groupId={groupId}
+        loadMore={loadMoreFeedAction.bind(null, groupId)}
+        showOwner
+        emptyMessage="まだ記録がありません。"
       />
     </div>
   );

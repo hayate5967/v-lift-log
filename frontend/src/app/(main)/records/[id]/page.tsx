@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { requireToken, requireUser } from '@/lib/session';
 import { getRecord } from '@/lib/api/records';
-import { notFoundOn404 } from '@/lib/api/errors';
+import { redirectOn401OrNotFoundOn404 } from '@/lib/api/errors';
+import { formatDate } from '@/lib/date';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { DeleteRecordButton } from '../DeleteRecordButton';
@@ -16,7 +17,7 @@ export default async function RecordDetailPage({
   const token = await requireToken();
 
   const [recordResult, user] = await Promise.all([
-    getRecord(token, id).catch(notFoundOn404),
+    getRecord(token, id).catch(redirectOn401OrNotFoundOn404),
     requireUser(token),
   ]);
   const isOwner = recordResult.userId === user.id;
@@ -26,7 +27,7 @@ export default async function RecordDetailPage({
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-bold">{recordResult.exercise.name}</h1>
         <span className="text-sm text-zinc-500">
-          {new Date(recordResult.performedAt).toLocaleDateString('ja-JP')}
+          {formatDate(recordResult.performedAt)}
         </span>
       </div>
       {!isOwner && (

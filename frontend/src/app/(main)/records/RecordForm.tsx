@@ -8,7 +8,6 @@ import { Exercise, Group } from '@/lib/api/types';
 import type { RecordFormState } from './actions';
 
 interface SetRow {
-  order: number;
   weight: string;
   reps: string;
   velocity: string;
@@ -38,8 +37,7 @@ interface RecordFormProps {
   submitLabel: string;
 }
 
-const emptySetRow = (order: number): SetRow => ({
-  order,
+const emptySetRow = (): SetRow => ({
   weight: '',
   reps: '',
   velocity: '',
@@ -55,25 +53,22 @@ export function RecordForm({
   const [state, formAction, pending] = useActionState(action, {});
   const [sets, setSets] = useState<SetRow[]>(
     initialValues && initialValues.sets.length > 0
-      ? initialValues.sets.map((s) => ({
-          order: s.order,
+      ? // sets はbackendからorder昇順で返る前提(records.repository.tsのincludeRelations)。
+        // orderは配列位置から導出するため、ここでは並び替えず順序をそのまま使う。
+        initialValues.sets.map((s) => ({
           weight: String(s.weight),
           reps: String(s.reps),
           velocity: s.velocity === null ? '' : String(s.velocity),
         }))
-      : [emptySetRow(1)],
+      : [emptySetRow()],
   );
 
   const addSet = () => {
-    setSets((prev) => [...prev, emptySetRow(prev.length + 1)]);
+    setSets((prev) => [...prev, emptySetRow()]);
   };
 
   const removeSet = (index: number) => {
-    setSets((prev) =>
-      prev
-        .filter((_, i) => i !== index)
-        .map((s, i) => ({ ...s, order: i + 1 })),
-    );
+    setSets((prev) => prev.filter((_, i) => i !== index));
   };
 
   const updateSet = (
@@ -87,8 +82,8 @@ export function RecordForm({
   };
 
   const setsJson = JSON.stringify(
-    sets.map((s) => ({
-      order: s.order,
+    sets.map((s, i) => ({
+      order: i + 1,
       weight: Number(s.weight),
       reps: Number(s.reps),
       velocity: s.velocity === '' ? undefined : Number(s.velocity),
@@ -130,7 +125,7 @@ export function RecordForm({
         <span className="text-sm font-medium text-zinc-700">セット</span>
         {sets.map((set, index) => (
           <div key={index} className="flex items-end gap-2">
-            <span className="w-4 pb-2 text-sm text-zinc-500">{set.order}</span>
+            <span className="w-4 pb-2 text-sm text-zinc-500">{index + 1}</span>
             <label className="flex flex-1 flex-col gap-1 text-xs text-zinc-600">
               重量(kg)
               <input

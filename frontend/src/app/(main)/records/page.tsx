@@ -2,7 +2,8 @@ import Link from 'next/link';
 import { requireToken } from '@/lib/session';
 import { listOwnRecords } from '@/lib/api/records';
 import { Button } from '@/components/ui/Button';
-import { RecordsList } from './RecordsList';
+import { PaginatedRecordsList } from '@/components/PaginatedRecordsList';
+import { loadMoreOwnRecordsAction } from './actions';
 
 export default async function RecordsPage() {
   const token = await requireToken();
@@ -13,7 +14,11 @@ export default async function RecordsPage() {
       <Link href="/records/new">
         <Button>+ 記録を追加</Button>
       </Link>
-      <RecordsList initialRecords={records} />
+      <PaginatedRecordsList
+        initialRecords={records}
+        loadMore={loadMoreOwnRecordsAction}
+        emptyMessage="まだ記録がありません。"
+      />
     </div>
   );
 }

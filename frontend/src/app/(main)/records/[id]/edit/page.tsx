@@ -3,7 +3,7 @@ import { requireToken, requireUser } from '@/lib/session';
 import { getRecord } from '@/lib/api/records';
 import { listExercises } from '@/lib/api/exercises';
 import { listGroups } from '@/lib/api/groups';
-import { notFoundOn404 } from '@/lib/api/errors';
+import { redirectOn401OrNotFoundOn404 } from '@/lib/api/errors';
 import { RecordForm } from '../../RecordForm';
 import { updateRecordAction } from '../../actions';
 
@@ -15,20 +15,17 @@ export default async function EditRecordPage({
   const { id } = await params;
   const token = await requireToken();
 
-  const [recordResult, user] = await Promise.all([
-    getRecord(token, id).catch(notFoundOn404),
+  const [recordResult, user, exercises, groups] = await Promise.all([
+    getRecord(token, id).catch(redirectOn401OrNotFoundOn404),
     requireUser(token),
+    listExercises(token),
+    listGroups(token),
   ]);
   if (recordResult.userId !== user.id) {
     // 閲覧はできても所有者でなければbackendがPATCHを403で弾くため、
     // フォームを見せずに詳細ページへ戻す。
     redirect(`/records/${id}`);
   }
-
-  const [exercises, groups] = await Promise.all([
-    listExercises(token),
-    listGroups(token),
-  ]);
 
   return (
     <div className="flex flex-col gap-4">
