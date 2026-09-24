@@ -5,21 +5,24 @@ import { Button } from '@/components/ui/Button';
 import { ErrorText } from '@/components/ui/ErrorText';
 import { RecordItem } from '@/lib/api/types';
 import { usePaginatedRecords } from '@/lib/usePaginatedRecords';
-import { loadMoreFeedAction } from './actions';
+import { loadMoreGroupRecordsAction } from '../actions';
 
-interface FeedListProps {
+export function GroupRecordsList({
+  groupId,
+  initialRecords,
+}: {
+  groupId: string;
   initialRecords: RecordItem[];
-  groupId?: string;
-}
-
-export function FeedList({ initialRecords, groupId }: FeedListProps) {
+}) {
   const { records, hasMore, error, isPending, loadMore } = usePaginatedRecords(
     initialRecords,
-    (cursor) => loadMoreFeedAction(cursor, groupId),
+    (cursor) => loadMoreGroupRecordsAction(groupId, cursor),
   );
 
   if (records.length === 0) {
-    return <p className="text-sm text-zinc-500">まだ記録がありません。</p>;
+    return (
+      <p className="text-sm text-zinc-500">まだ公開された記録がありません。</p>
+    );
   }
 
   return (

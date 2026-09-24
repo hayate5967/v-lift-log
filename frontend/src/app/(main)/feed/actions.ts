@@ -1,6 +1,7 @@
 'use server';
 
 import { listFeed } from '@/lib/api/records';
+import { redirectOn401 } from '@/lib/api/errors';
 import { requireToken } from '@/lib/session';
 import { RecordItem } from '@/lib/api/types';
 
@@ -13,5 +14,10 @@ export async function loadMoreFeedAction(
   groupId?: string,
 ): Promise<RecordItem[]> {
   const token = await requireToken();
-  return listFeed(token, { cursor, groupId });
+  try {
+    return await listFeed(token, { cursor, groupId });
+  } catch (e) {
+    redirectOn401(e);
+    throw e;
+  }
 }

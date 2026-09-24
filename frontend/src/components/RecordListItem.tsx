@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
 import { RecordItem } from '@/lib/api/types';
+import { formatDate } from '@/lib/date';
 
 /** /records・/feed で共用する記録一覧の1行分の表示。 */
 export function RecordListItem({
@@ -16,7 +17,7 @@ export function RecordListItem({
         <div className="flex items-center justify-between">
           <span className="font-medium">{record.exercise.name}</span>
           <span className="text-sm text-zinc-500">
-            {new Date(record.performedAt).toLocaleDateString('ja-JP')}
+            {formatDate(record.performedAt)}
           </span>
         </div>
         {showOwner ? (

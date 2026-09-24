@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 
 /** docs/api-spec.md 1.4「エラーレスポンス形式」。 */
 export interface ApiErrorBody {
@@ -27,4 +27,18 @@ export function notFoundOn404(e: unknown): never {
     notFound();
   }
   throw e;
+}
+
+/**
+ * Server Actionでの`catch (e) { redirectOn401(e); ...通常のエラー処理 }`用。
+ * requireToken()はCookieの有無しか見ないため、期限切れ等で失効したtokenの
+ * ままsubmitするとここで初めて401が分かる。lib/session.tsのrequireUser()と
+ * 同じ経路（Cookie削除+/loginへの巻き戻り）に揃え、フォームへ生のエラー
+ * メッセージを出したまま行き詰まらせない。401以外は何もせず戻り、
+ * 呼び出し元の既存のcatch処理に委ねる。
+ */
+export function redirectOn401(e: unknown): void {
+  if (e instanceof ApiError && e.status === 401) {
+    redirect('/session-expired');
+  }
 }

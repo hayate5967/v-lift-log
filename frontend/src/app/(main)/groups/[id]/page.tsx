@@ -2,8 +2,8 @@ import { requireToken } from '@/lib/session';
 import { getGroupDetail, listGroupRecords } from '@/lib/api/groups';
 import { notFoundOn404 } from '@/lib/api/errors';
 import { Card } from '@/components/ui/Card';
-import { RecordListItem } from '@/components/RecordListItem';
 import { CopyJoinCodeButton } from './CopyJoinCodeButton';
+import { GroupRecordsList } from './GroupRecordsList';
 
 export default async function GroupDetailPage({
   params,
@@ -47,19 +47,7 @@ export default async function GroupDetailPage({
 
       <div>
         <h2 className="mb-2 text-sm font-medium text-zinc-700">記録</h2>
-        {records.length === 0 ? (
-          <p className="text-sm text-zinc-500">
-            まだ公開された記録がありません。
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-3">
-            {records.map((record) => (
-              <li key={record.id}>
-                <RecordListItem record={record} showOwner />
-              </li>
-            ))}
-          </ul>
-        )}
+        <GroupRecordsList groupId={id} initialRecords={records} />
       </div>
     </div>
   );

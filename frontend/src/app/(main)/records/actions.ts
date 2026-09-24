@@ -10,7 +10,7 @@ import {
   type RecordInput,
   type SetInput,
 } from '@/lib/api/records';
-import { ApiError } from '@/lib/api/errors';
+import { ApiError, redirectOn401 } from '@/lib/api/errors';
 import { requireToken } from '@/lib/session';
 import { RecordItem } from '@/lib/api/types';
 
@@ -44,6 +44,7 @@ export async function createRecordAction(
   try {
     await createRecord(token, buildInput(formData));
   } catch (e) {
+    redirectOn401(e);
     return {
       error: e instanceof ApiError ? e.message : '通信エラーが発生しました',
     };
@@ -63,6 +64,7 @@ export async function updateRecordAction(
   try {
     await updateRecord(token, id, buildInput(formData));
   } catch (e) {
+    redirectOn401(e);
     return {
       error: e instanceof ApiError ? e.message : '通信エラーが発生しました',
     };
@@ -78,6 +80,7 @@ export async function deleteRecordAction(id: string): Promise<void> {
   try {
     await deleteRecord(token, id);
   } catch (e) {
+    redirectOn401(e);
     // deleteはuseActionStateを使わないフォームのため、フォーム内でエラー表示できない。
     // app/(main)/error.tsx の境界に捕捉させ、メッセージだけ分かりやすく保つ。
     throw new Error(
@@ -99,5 +102,10 @@ export async function loadMoreOwnRecordsAction(
   cursor: string,
 ): Promise<RecordItem[]> {
   const token = await requireToken();
-  return listOwnRecords(token, cursor);
+  try {
+    return await listOwnRecords(token, cursor);
+  } catch (e) {
+    redirectOn401(e);
+    throw e;
+  }
 }
