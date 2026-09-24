@@ -1,6 +1,7 @@
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { Exercise, StatsMetric } from '@/lib/api/types';
 
 const METRICS: { value: StatsMetric; label: string }[] = [
@@ -19,16 +20,23 @@ export function StatsFilter({
   metric?: StatsMetric;
 }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
 
   const updateParam = (key: string, value: string) => {
-    const params = new URLSearchParams(searchParams.toString());
+    // useSearchParams()の値はこのコンポーネントが再レンダリングされるまで
+    // 更新されないため、2つのselectを間を置かず操作すると片方のパラメータが
+    // 失われるレースになる。window.location.searchから都度読むことで、
+    // 直前のrouter.push()（historyのURL自体は同期的に更新される）を
+    // 確実に反映させる。
+    const params = new URLSearchParams(window.location.search);
     if (value) {
       params.set(key, value);
     } else {
       params.delete(key);
     }
-    router.push(`/stats?${params.toString()}`);
+    startTransition(() => {
+      router.push(`/stats?${params.toString()}`);
+    });
   };
 
   return (
@@ -36,7 +44,8 @@ export function StatsFilter({
       <select
         value={exerciseId ?? ''}
         onChange={(e) => updateParam('exerciseId', e.target.value)}
-        className="flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+        disabled={isPending}
+        className="flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm disabled:opacity-60"
       >
         <option value="">種目を選択</option>
         {exercises.map((exercise) => (
@@ -48,7 +57,8 @@ export function StatsFilter({
       <select
         value={metric ?? ''}
         onChange={(e) => updateParam('metric', e.target.value)}
-        className="flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+        disabled={isPending}
+        className="flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm disabled:opacity-60"
       >
         <option value="">指標を選択</option>
         {METRICS.map((m) => (
